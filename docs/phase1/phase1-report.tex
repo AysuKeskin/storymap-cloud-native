@@ -120,7 +120,7 @@ resources. It has four layers:
         media files are stored in Cloud Storage. Pods keep no state, so they
         can be added or removed at any time.
   \item \textbf{Background (serverless):} Cloud Functions create thumbnails
-        and send e-mails (via Pub/Sub), so this slow work does not delay API
+        and send e-mails through a Pub/Sub queue, so this slow work does not delay API
         responses.
 \end{itemize}
 
@@ -270,44 +270,55 @@ Pub/Sub and the load balancer do not count towards the Compute Engine limit.}
 % ------------------------------------------------------------
 \section{Cost Estimation}
 
-\textbf{Assumptions.} Prices are list prices for \code{us-central1} taken
-from the GCP pricing pages, and will be re-checked in the GCP Pricing
-Calculator before deployment. The project runs from \textbf{13 November to 23
-December 2026} (40 days, 960 hours). The billing currency of the account is
-TRY. The trial credit of TRY\,14{,}440.57 corresponds to \$300, so we use
-1\,USD $\approx$ 48.1\,TRY. On 13 November, \textbf{TRY\,13{,}796 ($\approx$\,\$287)}
-of credit remains. About \$13 was used before this project started.
+\textbf{Method.} The main items were priced with the official
+\href{https://cloud.google.com/products/calculator?dl=CjhDaVJpWldRd056VmpNeTA1T0RNNExUUXhOekV0T0RoaVlpMDFNek0yT1RkbU5qSTBZVFFRQVE9PRAPGiRDMjA5MDhCNi1GN0ZFLTRFNzAtQTQ2Ri0zRDRCRkM4QkE3MDQ}{GCP Pricing Calculator}
+(\code{us-central1}, on-demand, no committed-use discounts) on 13 November
+2026. Small items marked with $\dagger$ come from the GCP pricing pages and
+free-tier limits. The calculator gives monthly prices for 730 hours. The
+project runs from \textbf{13 November to 23 December 2026} (40 days, 960
+hours), so monthly values are multiplied by $960/730 \approx 1.315$.
 
-\subsection{System project (account A): baseline for 40 days, always on}
+\textbf{Available credit.} The billing currency of the account is TRY. The
+trial credit of TRY\,14{,}440.57 corresponds to \$300, so we use
+1\,USD $\approx$ 48.1\,TRY. On 13 November, \textbf{TRY\,13{,}796
+($\approx$\,\$287)} of credit remains. About \$13 was used before this
+project started.
+
+\subsection{System project (account A): 40 days, always on}
 
 {\small
-\begin{longtable}{L{3.4cm}L{3.9cm}L{3.9cm}L{3.3cm}}
+\begin{longtable}{L{3.5cm}L{4.6cm}L{3.0cm}L{3.0cm}}
 \toprule
-\textbf{Resource} & \textbf{Configuration} & \textbf{Unit price} & \textbf{Cost (960\,h)} \\
+\textbf{Resource} & \textbf{Configuration} & \textbf{Per month} & \textbf{40 days} \\
 \midrule
 \endfirsthead
 \toprule
-\textbf{Resource} & \textbf{Configuration} & \textbf{Unit price} & \textbf{Cost (960\,h)} \\
+\textbf{Resource} & \textbf{Configuration} & \textbf{Per month} & \textbf{40 days} \\
 \midrule
 \endhead
-GKE management fee & 1 zonal Standard cluster & \$0.10/h (\$96) &
-  \textbf{\$0.00} (covered by the \$74.40/month GKE free-tier credit) \\
-GKE nodes & 2 $\times$ e2-standard-2 & \$0.067/h each & \$128.64 \\
-Node boot disks & 2 $\times$ 30\,GB pd-standard & \$0.04/GB-month & \$3.20 \\
-mysql-vm & 1 $\times$ e2-medium & \$0.0335/h & \$32.16 \\
-mysql-vm disk + snapshots & 20\,GB pd-balanced + $\sim$5\,GB snapshots & \$0.10 and \$0.05/GB-month & \$3.00 \\
-HTTP(S) Load Balancer & 1 forwarding rule & \$0.025/h & \$24.00 \\
-Cloud NAT & 3 VM endpoints + low traffic & \$0.0014/h per VM + \$0.045/GB & \$4.53 \\
-Cloud Storage, Artifact Registry & $\sim$2\,GB each & \$0.020 and \$0.10/GB-month & \$0.30 \\
-Cloud Functions & $<$\,100k invocations & free tier: 2M req., 180k vCPU-s & \$0.00 \\
-Pub/Sub & $<$\,1\,GB & first 10\,GiB/month free & \$0.00 \\
-Monitoring and Logging & within free allotment (50\,GiB logs) & -- & \$0.00 \\
-Internet egress (normal use) & $\sim$10\,GB & $\sim$\$0.12/GB & \$1.50 \\
+GKE management fee & 1 zonal Standard cluster & \$73.00 &
+  \textbf{\$0.00}\,\textsuperscript{a} \\
+GKE nodes & 2 $\times$ e2-standard-2 & \$97.84 & \$128.67 \\
+GKE node boot disks & 2 $\times$ 30\,GB standard PD & \$2.40 & \$3.16 \\
+mysql-vm & 1 $\times$ e2-medium & \$24.46 & \$32.17 \\
+mysql-vm boot disk & 20\,GB balanced PD & \$2.00 & \$2.63 \\
+Disk snapshots$^\dagger$ & $\sim$5\,GB & \$0.25 & \$0.33 \\
+Cloud Load Balancing & 1 forwarding rule, 60\,GB processed & \$19.21 & \$25.26 \\
+Cloud NAT & 3 VMs, 1 NAT IP address, 1\,GB processed & \$6.76 & \$8.89 \\
+Internet egress & 60\,GB, Premium tier & \$11.21 & \$14.74 \\
+Cloud Storage, Artifact Registry$^\dagger$ & $\sim$2\,GB each & \$0.23 & \$0.30 \\
+Cloud Functions, Pub/Sub$^\dagger$ & $<$\,100k invocations, $<$\,1\,GB messages & free tier & \$0.00 \\
+Monitoring, Logging$^\dagger$ & within the free allotment (50\,GiB logs) & free tier & \$0.00 \\
 \midrule
-\textbf{Total (40 days)} & & & \textbf{$\approx$\,\$197} \\
+\textbf{Total} & & \textbf{\$164.36}\,\textsuperscript{a} & \textbf{$\approx$\,\$216} \\
 \bottomrule
 \end{longtable}
 }
+
+{\footnotesize \textsuperscript{a}\,The calculator lists the \$73 cluster
+management fee. It is fully covered by the \$74.40/month GKE free-tier
+credit, so it is excluded from the totals. The 60\,GB of load-balancer and
+egress traffic already includes the load-test traffic.\par}
 
 \subsection{Load-testing campaign (about 30 test hours)}
 
@@ -317,13 +328,11 @@ Internet egress (normal use) & $\sim$10\,GB & $\sim$\$0.12/GB & \$1.50 \\
 \textbf{Billed to} & \textbf{Resource} & \textbf{Usage} & \textbf{Cost} \\
 \midrule
 System (A) & Third GKE node from autoscaling & 30\,h $\times$ \$0.067/h & \$2.05 \\
-System (A) & LB data processing & $\sim$50\,GB $\times$ \$0.008/GB & \$0.40 \\
-System (A) & Response egress to the load generator & $\sim$50\,GB $\times$ up to \$0.12/GB & \$6.00 \\
 \midrule
 Load testing (B) & locust-vm e2-standard-4 & 30\,h $\times$ \$0.134/h (on-demand; Spot is cheaper) & \$4.02 \\
-Load testing (B) & locust-vm disk + egress & 20\,GB pd-standard, $\sim$5\,GB requests & \$1.70 \\
+Load testing (B) & locust-vm disk + egress & 20\,GB standard PD, $\sim$5\,GB requests & \$1.70 \\
 \midrule
-\textbf{Total} & & & \textbf{$\approx$\,\$14} \\
+\textbf{Total} & & & \textbf{$\approx$\,\$8} \\
 \bottomrule
 \end{tabularx}
 }
@@ -335,10 +344,10 @@ Load testing (B) & locust-vm disk + egress & 20\,GB pd-standard, $\sim$5\,GB req
 \toprule
 \textbf{Scenario} & \textbf{Calculation} & \textbf{Total} & \textbf{Share of credit} \\
 \midrule
-System (A), worst case: always on & \$197 + \$8.45 (load tests) & \textbf{$\approx$\,\$206} & 72\,\% of \$287 \\
-System (A), planned: torn down when idle & $\sim$50\,\% of baseline hours + load tests & \textbf{$\approx$\,\$107} & 37\,\% of \$287 \\
+System (A), worst case: always on & \$216 + \$2 (third node) & \textbf{$\approx$\,\$218} & 76\,\% of \$287 \\
+System (A), planned: torn down when idle & $\sim$50\,\% of baseline hours + load tests & \textbf{$\approx$\,\$110} & 38\,\% of \$287 \\
 Load testing (B) & locust-vm only & \textbf{$\approx$\,\$6} & 2\,\% of \$300 \\
-Both accounts combined, worst case & \$206 + \$6 & \textbf{$\approx$\,\$212} & below one \$300 credit \\
+Both accounts combined, worst case & \$218 + \$6 & \textbf{$\approx$\,\$224} & below one \$300 credit \\
 \bottomrule
 \end{tabularx}
 }
