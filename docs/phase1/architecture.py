@@ -1,7 +1,7 @@
 """Draws the Phase 1 GCP architecture diagram (PNG, PDF, SVG).
 
 Layout is set by hand (1 unit = 1 inch) so that the diagram reads top-down:
-users -> load balancer -> ingress -> services -> pods -> data / events.
+users -> load balancer -> services -> pods -> data / events.
 Run:  python3 architecture.py
 """
 import matplotlib
@@ -86,13 +86,14 @@ cluster(6.2, 13.25, 12.8, 15.15,
 cluster(0.3, 0.95, 24.7, 12.95,
         "System project (account A, free trial, max 8 vCPU)  -  us-central1  -  Terraform",
         edge="#1a73e8", ls="--", label_x=11.0)
-cluster(0.6, 1.3, 18.0, 10.95, "VPC: storymap-vpc (private subnet)",
+cluster(0.6, 1.3, 18.0, 10.95, "VPC: storymap-vpc (private subnet, no public IPs)",
         fill="#f8f9fa", edge="#9aa0a6", fc=GREY, label_x=9.3)
-cluster(0.9, 6.6, 5.9, 8.55, "Kubernetes Services",
-        fill="#eef3fd", edge="#8ab4f8", fc="#1a73e8", z=2)
-cluster(6.3, 1.9, 14.6, 10.45,
+# The Kubernetes Services live inside the GKE cluster.
+cluster(0.8, 1.9, 14.6, 10.45,
         "GKE Standard zonal cluster  -  private nodes",
-        fill="#e6f4ea", edge="#188038", z=2)
+        fill="#e6f4ea", edge="#188038", label_x=9.6, z=2)
+cluster(0.95, 6.6, 5.9, 8.55, "Kubernetes Services",
+        fill="#eef3fd", edge="#8ab4f8", fc="#1a73e8", z=3)
 cluster(15.1, 2.4, 17.7, 5.1, "Compute Engine VM",
         fill="#fef7e0", edge="#e37400", label_pos="bottom", z=2)
 cluster(18.4, 3.2, 24.4, 7.1, "Event-driven / serverless",
@@ -108,13 +109,15 @@ node(9.5, 14.05, 4.9, 0.8,
 node(16.4, 14.25, 2.8, 0.8, "Nominatim API", fill="#e8eaed", shape="ellipse")
 node(23.2, 14.25, 3.0, 0.8, "Resend email API", fill="#e8eaed", shape="ellipse")
 
-node(3.3, 11.85, 4.4, 0.8, "External HTTP(S) Load Balancer\nstatic public IP", fill="#e8f0fe")
-node(3.3, 9.6, 4.2, 0.8, "GKE Ingress\nstorymap-ingress", fill="#e8f0fe")
+# The GKE Ingress object is the configuration that creates this load balancer.
+node(3.3, 11.75, 4.6, 1.05,
+     "External HTTP(S) Load Balancer\nstatic public IP\ncreated by GKE Ingress (storymap-ingress)",
+     fill="#e8f0fe", fs=14)
 
 node(2.15, 7.4, 2.2, 0.8, "api Service\nport 8000")
 node(4.65, 7.4, 2.2, 0.8, "frontend Service\nport 80")
 
-node(7.7, 8.9, 2.4, 0.8, "frontend HPA\n1-3 replicas", fill="#fef7e0")
+node(7.6, 8.9, 2.8, 0.8, "frontend HPA\n1-3 replicas @ 60% CPU", fill="#fef7e0")
 node(10.6, 8.9, 2.8, 0.8, "api HPA\n2-8 replicas @ 60% CPU", fill="#fef7e0")
 node(7.7, 6.0, 2.4, 0.9, "frontend Pods\nnginx + React build")
 node(10.6, 6.0, 2.8, 0.9, "api Pods\nDjango REST + Gunicorn", lw=2.2)
@@ -138,13 +141,13 @@ node(20.0, 8.45, 2.6, 0.8, "Cloud Monitoring\n+ Logging")
 
 # ---------------------------------------------------------------- edges
 ORANGE = "#e37400"
-edge([(2.6, 13.75), (2.6, 12.25)], "HTTPS", at=(2.5, 13.05), ha="right")
-edge([(7.05, 14.05), (4.4, 14.05), (4.4, 12.25)], "load test via public IP",
+edge([(2.6, 13.75), (2.6, 12.28)], "HTTP(S)", at=(2.5, 13.05), ha="right")
+edge([(7.05, 14.05), (4.4, 14.05), (4.4, 12.28)], "load test via public IP",
      at=(4.55, 13.05), ha="left", color=ORANGE, ls="--")
-edge([(3.3, 11.45), (3.3, 10.0)], "routes", at=(3.45, 10.72), ha="left")
 
-edge([(2.15, 9.2), (2.15, 7.8)], "/api/*", at=(2.15, 8.65))
-edge([(4.65, 9.2), (4.65, 7.8)], "/*", at=(4.65, 8.65))
+# The load balancer routes by path straight to the Services' backends.
+edge([(2.15, 11.22), (2.15, 7.8)], "/api/*", at=(2.15, 9.6))
+edge([(4.65, 11.22), (4.65, 7.8)], "/*", at=(4.65, 9.6))
 
 edge([(4.65, 7.0), (4.65, 6.0), (6.5, 6.0)])
 edge([(2.15, 7.0), (2.15, 5.1), (9.45, 5.1), (9.45, 5.55)])
@@ -177,12 +180,10 @@ edge([(22.2, 4.15), (20.7, 4.15)], "write thumbnail", at=(21.45, 3.9))
 edge([(23.2, 6.5), (23.2, 13.85)], "send e-mail (HTTPS)", at=(23.05, 11.9),
      ha="right", ls=":")
 
-# lanes drawn outside every box
-edge([(23.2, 14.65), (23.2, 15.55), (2.6, 15.55), (2.6, 14.75)],
-     "e-mail notification", at=(17.0, 15.55), ls="--")
+# lane drawn outside every box: browsers fetch media straight from the bucket
 edge([(1.3, 14.25), (0.12, 14.25), (0.12, 0.62), (19.6, 0.62), (19.6, 3.9)],
-     "media download (public or signed URL), direct from the bucket",
-     at=(9.5, 0.62), ls="--", style="<|-|>")
+     "media download (HTTPS, public or signed URL), direct from the bucket",
+     at=(9.5, 0.62), ls="--")
 
 for ext in ("png", "pdf", "svg"):
     fig.savefig(f"architecture.{ext}", dpi=170 if ext == "png" else None,
