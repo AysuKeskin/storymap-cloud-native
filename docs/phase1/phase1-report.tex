@@ -110,42 +110,27 @@ search), media uploads, comments and likes, tags, notifications, gamification
 
 \subsection{Overview}
 
-The system is a layered, cloud-native deployment of the Story Map application
-inside a single GCP project. Every resource in the project is created with
-Terraform. The architecture has four layers:
+The system runs in one GCP project, and Terraform creates all of its
+resources. It has four layers:
 
 \begin{itemize}
-  \item \textbf{Entry layer.} An external HTTP(S) load balancer, created by
-        the GKE Ingress, is the only public endpoint. It sends web traffic to
-        the frontend and API traffic to the backend.
-  \item \textbf{Stateless compute layer (Kubernetes).} The React frontend and
-        the Django REST API run as Deployments on a GKE cluster. The
-        Horizontal Pod Autoscaler adds or removes API pods with the load. The
-        cluster autoscaler adds a node when the pods no longer fit. An
-        in-cluster Redis instance gives all pods a shared cache.
-  \item \textbf{Stateful data layer.} Persistent state is kept in two places.
-        Relational data lives in \textbf{MySQL on a Compute Engine VM} with a
-        private IP only. User media lives in a \textbf{Cloud Storage} bucket.
-        Because no state is kept inside the pods, any pod can be created or
-        removed at any time.
-  \item \textbf{Event-driven layer (serverless).} Slow or background work is
-        moved off the request path. A file upload to the bucket triggers a
-        \textbf{Cloud Function} that creates thumbnails. E-mail requests are
-        published to a \textbf{Pub/Sub} topic and delivered by another Cloud
-        Function. The API can therefore respond quickly while these tasks
-        scale independently and retry on failure.
+  \item \textbf{Entry:} a load balancer is the only public endpoint.
+  \item \textbf{Compute (Kubernetes):} the frontend and the Django API run on
+        GKE. The API scales automatically with HPA and shares a Redis cache.
+  \item \textbf{Data (VM + storage):} MySQL runs on a Compute Engine VM, and
+        media files are stored in Cloud Storage. Pods keep no state, so they
+        can be added or removed at any time.
+  \item \textbf{Background (serverless):} Cloud Functions create thumbnails
+        and send e-mails (via Pub/Sub), so this slow work does not delay API
+        responses.
 \end{itemize}
 
-The three mandatory building blocks of the project map directly onto these
-layers. \textbf{Kubernetes} hosts the scalable stateless services.
-\textbf{Virtual machines} host the database. The VM is the stateful core of
-the system, not an add-on. \textbf{Cloud Functions} handle event-driven
-background processing. A private VPC with Cloud NAT isolates internal traffic.
-Cloud Monitoring collects the latency, throughput and resource metrics for the
-performance evaluation. The Locust load generator runs outside the system
-project and sends traffic through the same public endpoint as real users.
+This covers the three required building blocks: Kubernetes, virtual machines
+and Cloud Functions. Locust sends load from a separate project, through the
+same public endpoint as real users.
 
-\begin{figure}[tbp]
+
+\begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{architecture.pdf}
   \caption{Tentative GCP architecture. The system runs in one project that is
