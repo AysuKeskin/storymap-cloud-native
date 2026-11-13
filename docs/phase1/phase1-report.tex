@@ -283,11 +283,11 @@ Pub/Sub and the load balancer do not count towards the Compute Engine limit.}
 % ------------------------------------------------------------
 \section{Cost Estimation}
 
-\textbf{Method.} The main items were priced with the official
+\textbf{Method.} All items were priced with the official
 \href{https://cloud.google.com/products/calculator?dl=CjhDaVJpWldRd056VmpNeTA1T0RNNExUUXhOekV0T0RoaVlpMDFNek0yT1RkbU5qSTBZVFFRQVE9PRAPGiRDMjA5MDhCNi1GN0ZFLTRFNzAtQTQ2Ri0zRDRCRkM4QkE3MDQ}{GCP Pricing Calculator}
 (\code{us-central1}, on-demand, no committed-use discounts) on 13 November
-2026. Small items marked with $\dagger$ come from the GCP pricing pages and
-free-tier limits. The calculator gives monthly prices for 730 hours. The
+2026. Items that stay within their free tier are shown as \$0.00. The
+calculator gives monthly prices for 730 hours. The
 project runs from \textbf{13 November to 23 December 2026} (40 days, 960
 hours), so monthly values are multiplied by $960/730 \approx 1.315$.
 
@@ -315,13 +315,13 @@ GKE nodes & 2 $\times$ e2-standard-2 & \$97.84 & \$128.67 \\
 GKE node boot disks & 2 $\times$ 30\,GB standard PD & \$2.40 & \$3.16 \\
 mysql-vm & 1 $\times$ e2-medium & \$24.46 & \$32.17 \\
 mysql-vm boot disk & 20\,GB balanced PD & \$2.00 & \$2.63 \\
-Disk snapshots$^\dagger$ & $\sim$5\,GB & \$0.25 & \$0.33 \\
+Disk snapshots & $\sim$5\,GB & \$0.25 & \$0.33 \\
 Cloud Load Balancing & 1 forwarding rule, 60\,GB processed & \$19.21 & \$25.26 \\
 Cloud NAT & 3 VMs, 1 NAT IP address, 1\,GB processed & \$6.76 & \$8.89 \\
 Internet egress & 60\,GB, Premium tier & \$11.21 & \$14.74 \\
-Cloud Storage, Artifact Registry$^\dagger$ & $\sim$2\,GB each & \$0.23 & \$0.30 \\
-Cloud Functions, Pub/Sub$^\dagger$ & $<$\,100k invocations, $<$\,1\,GB messages & free tier & \$0.00 \\
-Monitoring, Logging$^\dagger$ & within the free allotment (50\,GiB logs) & free tier & \$0.00 \\
+Cloud Storage, Artifact Registry & $\sim$2\,GB each & \$0.23 & \$0.30 \\
+Cloud Functions, Pub/Sub & $<$\,100k invocations, $<$\,1\,GB messages & free tier & \$0.00 \\
+Monitoring, Logging & within the free allotment (50\,GiB logs) & free tier & \$0.00 \\
 \midrule
 \textbf{Total} & & \textbf{\$164.36}\,\textsuperscript{a} & \textbf{$\approx$\,\$216} \\
 \bottomrule
