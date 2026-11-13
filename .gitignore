@@ -1,0 +1,38 @@
+# Environment / secrets
+.env
+.env.prod
+*.env.local
+app/.env
+app/.env.prod
+**/credentials*.json
+**/*-key.json
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl.bak
+crash.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+htmlcov/
+
+# Node
+node_modules/
+dist/
+
+# Locust results
+locust/results/*
+!locust/results/.gitkeep
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

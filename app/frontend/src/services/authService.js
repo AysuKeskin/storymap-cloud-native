@@ -1,0 +1,60 @@
+import axios from "axios";
+import { setAccessToken, setRefreshToken, getRefreshToken, clear } from "./tokenStore";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+export async function login(email, password) {
+  const response = await axios.post(`${API_URL}/auth/login/`, { email, password });
+  const { access, refresh } = response.data;
+  setAccessToken(access);
+  setRefreshToken(refresh);
+  return response.data;
+}
+
+export async function register(username, email, password, passwordConfirmation) {
+  const response = await axios.post(`${API_URL}/auth/register/`, {
+    username,
+    email,
+    password,
+    password_confirmation: passwordConfirmation,
+  });
+  return response.data;
+}
+
+export async function logout() {
+  try {
+    const refresh = getRefreshToken();
+    await axios.post(`${API_URL}/auth/logout/`, { refresh });
+  } catch {
+    // Silently ignore logout API errors
+  } finally {
+    clear();
+  }
+}
+
+export async function forgotPassword(email) {
+  const response = await axios.post(`${API_URL}/auth/password-reset/`, { email });
+  return response.data;
+}
+
+export async function resetPassword(token, newPassword, newPasswordConfirmation) {
+  const response = await axios.post(`${API_URL}/auth/password-reset/confirm/`, {
+    token,
+    new_password: newPassword,
+    new_password_confirmation: newPasswordConfirmation,
+  });
+  return response.data;
+}
+
+// Email verification endpoints are intentionally unauthenticated — the user
+// has just registered and does not yet have JWT tokens. Use the raw axios
+// client (no Authorization header) rather than the authenticated api client.
+export async function verifyEmail(email, code) {
+  const response = await axios.post(`${API_URL}/auth/verify-email/`, { email, code });
+  return response.data;
+}
+
+export async function resendVerificationCode(email) {
+  const response = await axios.post(`${API_URL}/auth/resend-verification/`, { email });
+  return response.data;
+}

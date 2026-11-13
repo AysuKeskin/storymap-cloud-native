@@ -1,0 +1,104 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+import ProtectedRoute from "@/components/ProtectedRoute";
+import AdminRoute from "@/components/AdminRoute";
+import AppLayout from "@/components/AppLayout/AppLayout";
+import AdminLayout from "@/components/AdminPanel/AdminLayout";
+import AdminReportsPage from "@/pages/admin/AdminReportsPage";
+import AdminStoriesPage from "@/pages/admin/AdminStoriesPage";
+import AdminUsersPage from "@/pages/admin/AdminUsersPage";
+import AdminTagsPage from "@/pages/admin/AdminTagsPage";
+import { AuthProvider } from "@/context/AuthContext";
+import { ToastProvider } from "@/context/ToastContext";
+import { Toaster } from "@/components/ui/toaster";
+import LoginPage from "@/pages/LoginPage";
+import RegisterPage from "@/pages/RegisterPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import VerifyEmailPage from "@/pages/VerifyEmailPage";
+import ProfileCompletionPage from "@/pages/ProfileCompletionPage";
+import NotFoundPage from "@/pages/NotFoundPage";
+import FeedPage from "@/pages/FeedPage";
+import MapPage from "@/pages/MapPage";
+import TimelinePage from "@/pages/TimelinePage";
+import ProfilePage from "@/pages/ProfilePage";
+import SubmitStoryPage from "@/pages/SubmitStoryPage";
+import StoryDetailPage from "@/pages/StoryDetailPage";
+import TagPage from "@/pages/TagPage";
+import NotificationPreferencesPage from "@/pages/NotificationPreferencesPage";
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <ToastProvider>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<FeedPage />} />
+              <Route path="/map" element={<MapPage />} />
+              <Route path="/timeline" element={<TimelinePage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route
+                path="/complete-profile"
+                element={(
+                  <ProtectedRoute>
+                    <ProfileCompletionPage />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/profile"
+                element={(
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/submit-story"
+                element={(
+                  <ProtectedRoute>
+                    <SubmitStoryPage />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route
+                path="/notifications/preferences"
+                element={(
+                  <ProtectedRoute>
+                    <NotificationPreferencesPage />
+                  </ProtectedRoute>
+                )}
+              />
+              <Route path="/profile/:userId" element={<ProfilePage />} />
+              <Route path="/stories/:id" element={<StoryDetailPage />} />
+              <Route path="/tags/:slug" element={<TagPage />} />
+              <Route
+                path="/admin"
+                element={(
+                  <AdminRoute>
+                    <AdminLayout />
+                  </AdminRoute>
+                )}
+              >
+                <Route index element={<AdminReportsPage />} />
+                <Route path="reports" element={<AdminReportsPage />} />
+                <Route path="stories" element={<AdminStoriesPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+                <Route path="tags" element={<AdminTagsPage />} />
+              </Route>
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+          </Routes>
+          <Toaster />
+        </ToastProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
+
+export default App;

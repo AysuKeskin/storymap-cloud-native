@@ -1,0 +1,28 @@
+from django.urls import path
+
+from apps.users.views import (
+    CurrentUserView,
+    FollowerListView,
+    FollowingListView,
+    FollowView,
+    ProfilePhotoView,
+    UserBookmarksView,
+    UserPublicProfileView,
+    UserStoriesView,
+)
+
+app_name = 'users_profile'
+
+# Registered under 'users/' in config/urls.py.
+# 'me/' is listed before '<int:user_id>/' as a matter of convention; Django's
+# int converter already prevents 'me' from matching the parameterised route.
+urlpatterns = [
+    path('me/', CurrentUserView.as_view(), name='current-user'),
+    path('me/photo/', ProfilePhotoView.as_view(), name='current-user-photo'),
+    path('<int:user_id>/', UserPublicProfileView.as_view(), name='user-public-profile'),
+    path('<int:user_id>/follow/', FollowView.as_view(), name='user-follow'),
+    path('<int:user_id>/followers/', FollowerListView.as_view(), name='user-followers'),
+    path('<int:user_id>/following/', FollowingListView.as_view(), name='user-following'),
+    path('<int:user_id>/bookmarks/', UserBookmarksView.as_view(), name='user-bookmarks'),
+    path('<int:user_id>/stories/', UserStoriesView.as_view(), name='user-stories'),
+]

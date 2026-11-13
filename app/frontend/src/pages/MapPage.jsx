@@ -1,0 +1,84 @@
+import { useState, useEffect, useCallback, useMemo } from "react";
+
+import MapView from "@/components/MapView/MapView";
+import SearchFilter from "@/components/SearchFilter/SearchFilter";
+import { getMapStories, MAP_SEARCH_CAP } from "@/services/storyService";
+import { useFilterState } from "@/hooks/useFilterState";
+
+const EMPTY_FEATURE_COLLECTION = { type: "FeatureCollection", features: [] };
+
+function MapPage() {
+  const { q, yearFrom, yearTo, location, latMin, latMax, lngMin, lngMax, latitude, longitude, radiusKm, tags, hasActiveFilters } = useFilterState();
+
+  const [featureCollection, setFeatureCollection] = useState(EMPTY_FEATURE_COLLECTION);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const bbox = useMemo(() => {
+    if (latMin == null || latMax == null || lngMin == null || lngMax == null) return null;
+    return { latMin, latMax, lngMin, lngMax };
+  }, [latMin, latMax, lngMin, lngMax]);
+
+  const proximity = useMemo(() => {
+    if (latitude == null || longitude == null || radiusKm == null) return null;
+    return { latitude, longitude, radiusKm };
+  }, [latitude, longitude, radiusKm]);
+
+  const fetchPins = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getMapStories({ q, yearFrom, yearTo, location, latMin, latMax, lngMin, lngMax, latitude, longitude, radiusKm, tags });
+      setFeatureCollection(data ?? EMPTY_FEATURE_COLLECTION);
+    } catch (err) {
+      setError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          "Failed to load map pins. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [q, yearFrom, yearTo, location, latMin, latMax, lngMin, lngMax, latitude, longitude, radiusKm, tags]);
+
+  useEffect(() => {
+    fetchPins();
+  }, [fetchPins]);
+
+  return (
+    <div className="relative isolate" style={{ height: "calc(100vh - 3.5rem)" }}>
+      <MapView featureCollection={featureCollection} loading={loading} bbox={bbox} proximity={proximity} />
+
+      {/* Search & filter overlay */}
+      <div className="absolute top-3 left-3 right-3 z-[1000] sm:left-4 sm:right-auto sm:w-[32rem]">
+        <div className="rounded-lg border bg-background/95 p-3 shadow-md backdrop-blur-sm">
+          <SearchFilter />
+          {hasActiveFilters && !loading && !error && (
+            <p className="mt-2 text-sm text-muted-foreground" aria-live="polite">
+              {featureCollection.features.length === 0
+                ? "No stories match your search."
+                : `${featureCollection.features.length} ${featureCollection.features.length === 1 ? "story" : "stories"} found.`}
+              {featureCollection.features.length > 0 && q && (featureCollection.totalCount ?? featureCollection.features.length) > MAP_SEARCH_CAP && (
+                <span className="block text-xs">Showing first 100 results.</span>
+              )}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div
+          className="absolute bottom-4 left-1/2 z-[1001] -translate-x-1/2 rounded-md bg-destructive/90 px-4 py-2 text-sm text-destructive-foreground shadow-md"
+          role="alert"
+        >
+          {error}
+          <button className="ml-3 underline font-medium" onClick={fetchPins}>
+            Retry
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default MapPage;

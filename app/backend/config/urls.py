@@ -1,0 +1,40 @@
+from django.conf import settings
+from django.contrib import admin
+from django.urls import path, include
+from django.conf.urls.static import static
+from drf_spectacular.renderers import OpenApiJsonRenderer2
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+
+urlpatterns = [
+    # No 'api/' prefix here — nginx strips it before forwarding to Django.
+    # JSON-only schema renderer. The relative UI schema URL resolves to
+    # /schema/ locally and /api/schema/ behind production nginx.
+    path('schema/', SpectacularAPIView.as_view(renderer_classes=[OpenApiJsonRenderer2]), name='schema'),
+    path('docs/', SpectacularSwaggerView.as_view(url='../schema/?format=json'), name='swagger-ui'),
+    path('redoc/', SpectacularRedocView.as_view(url='../schema/?format=json'), name='redoc'),
+    path('admin/', admin.site.urls),
+    path('auth/', include('apps.users.urls', namespace='users')),
+    path('users/', include('apps.users.profile_urls')),
+    path('', include('apps.interactions.urls', namespace='interactions')),
+    path('', include('apps.notifications.urls', namespace='notifications')),
+    path('', include('apps.gamification.urls', namespace='gamification')),
+    path('', include('apps.media.urls', namespace='media')),
+    path('stories/', include('apps.stories.urls', namespace='stories')),
+    path('tags/', include('apps.tags.urls', namespace='tags')),
+    path('', include('apps.reports.urls', namespace='reports')),
+    path('geocode/', include('apps.geocoding.urls', namespace='geocoding')),
+    path('moderation/', include([
+        path('', include('apps.users.admin_urls')),
+        path('', include('apps.tags.admin_urls')),
+        path('', include('apps.stories.admin_urls')),
+        path('', include('apps.interactions.admin_urls')),
+        path('', include('apps.reports.admin_urls')),
+    ])),
+]
+
+if settings.DEBUG and 'debug_toolbar' in settings.INSTALLED_APPS:
+    import debug_toolbar
+    urlpatterns = [path('__debug__/', include(debug_toolbar.urls))] + urlpatterns
+
+if settings.DEBUG:                                                                                        
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
