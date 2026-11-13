@@ -4,7 +4,7 @@ digraph storymap_gcp {
   edge  [fontname="Helvetica", fontsize=16, color="#5f6368", arrowsize=0.9, penwidth=1.3];
 
   // ---------- clients ----------
-  users  [label="End users\nWeb / Mobile", shape=ellipse, fillcolor="#e8eaed", ];
+  users  [label="End users\n(web browser)", shape=ellipse, fillcolor="#e8eaed", ];
 
   subgraph cluster_gcp {
     label="System project (account A, free trial, max 8 vCPU) - us-central1 - provisioned with Terraform";
