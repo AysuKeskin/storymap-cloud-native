@@ -220,13 +220,13 @@ Pub/Sub and the load balancer do not count towards the Compute Engine limit.}
   load from outside the system project, through the public endpoint. \\
 \textbf{Media bucket} & Cloud Storage &
   Stores user-uploaded images, audio and video, plus generated thumbnails. \\
-\textbf{make-thumbnail} & Cloud Function (2nd gen), GCS \emph{object finalize} trigger &
+\textbf{make-thumbnail} & Cloud Function, GCS \emph{object finalize} trigger &
   Creates resized thumbnails for every uploaded image and writes them back to
   the bucket. \\
 \textbf{email-events} & Pub/Sub topic &
   Asynchronous queue that decouples the API from e-mail delivery (registration
   verification, password reset, notification e-mails). \\
-\textbf{send-email} & Cloud Function (2nd gen), Pub/Sub trigger &
+\textbf{send-email} & Cloud Function, Pub/Sub trigger &
   Consumes \code{email-events} and sends the message through the Resend e-mail
   API. Retries on failure. \\
 \textbf{Artifact Registry} & Docker repository &
@@ -267,26 +267,6 @@ Pub/Sub and the load balancer do not count towards the Compute Engine limit.}
         applied with \code{kubectl}.
 \end{enumerate}
 
-\subsection{Planned performance experiments (preview)}
-
-Locust user classes will simulate (a) anonymous visitors browsing the map,
-feed and story details, (b) logged-in users who like and comment, and
-(c) content creators who post stories with images. Geocoding requests are
-served from cache or a stub during load tests, so that the public Nominatim
-service is never load-tested.
-
-\begin{tabularx}{\linewidth}{YY}
-\toprule
-\textbf{Independent variables} & \textbf{Dependent variables} \\
-\midrule
-Number of concurrent users and spawn rate & p50 / p95 / p99 latency \\
-Read vs.\ write traffic mix & Throughput (requests per second) \\
-Redis cache on vs.\ off & Error rate \\
-HPA on (2--8 pods) vs.\ fixed replicas & CPU and memory of pods and the MySQL VM \\
-Synchronous vs.\ Pub/Sub e-mail & Pod and node count over time \\
-\bottomrule
-\end{tabularx}
-
 % ------------------------------------------------------------
 \section{Cost Estimation}
 
@@ -319,7 +299,7 @@ mysql-vm disk + snapshots & 20\,GB pd-balanced + $\sim$5\,GB snapshots & \$0.10 
 HTTP(S) Load Balancer & 1 forwarding rule & \$0.025/h & \$24.00 \\
 Cloud NAT & 3 VM endpoints + low traffic & \$0.0014/h per VM + \$0.045/GB & \$4.53 \\
 Cloud Storage, Artifact Registry & $\sim$2\,GB each & \$0.020 and \$0.10/GB-month & \$0.30 \\
-Cloud Functions (2nd gen) & $<$\,100k invocations & free tier: 2M req., 180k vCPU-s & \$0.00 \\
+Cloud Functions & $<$\,100k invocations & free tier: 2M req., 180k vCPU-s & \$0.00 \\
 Pub/Sub & $<$\,1\,GB & first 10\,GiB/month free & \$0.00 \\
 Monitoring and Logging & within free allotment (50\,GiB logs) & -- & \$0.00 \\
 Internet egress (normal use) & $\sim$10\,GB & $\sim$\$0.12/GB & \$1.50 \\
