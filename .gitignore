@@ -36,3 +36,9 @@ locust/results/*
 .DS_Store
 .idea/
 .vscode/
+
+# LaTeX build artefacts
+*.log
+*.aux
+*.out
+*.synctex.gz

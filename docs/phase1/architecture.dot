@@ -1,10 +1,10 @@
 digraph storymap_gcp {
-  graph [rankdir=TB, fontname="Helvetica", fontsize=12, splines=true, nodesep=0.45, ranksep=0.6, pad=0.3, newrank=true, compound=true];
-  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, fillcolor="#ffffff", color="#5f6368", width=2.2];
-  edge  [fontname="Helvetica", fontsize=9, color="#5f6368", arrowsize=0.7];
+  graph [rankdir=TB, fontname="Helvetica", fontsize=20, splines=true, nodesep=0.3, ranksep=0.45, pad=0.3, newrank=true, compound=true];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=19, fillcolor="#ffffff", color="#5f6368", margin="0.15,0.06"];
+  edge  [fontname="Helvetica", fontsize=16, color="#5f6368", arrowsize=0.9, penwidth=1.3];
 
   // ---------- clients ----------
-  users  [label="End users\nWeb / Mobile", shape=ellipse, fillcolor="#e8eaed", width=1.6];
+  users  [label="End users\nWeb / Mobile", shape=ellipse, fillcolor="#e8eaed", ];
 
   subgraph cluster_gcp {
     label="GCP project - us-central1 - all resources provisioned with Terraform";
@@ -46,8 +46,8 @@ digraph storymap_gcp {
     }
   }
 
-  nominatim [label="Nominatim API", shape=ellipse, fillcolor="#e8eaed", width=1.6];
-  resend    [label="Resend email API", shape=ellipse, fillcolor="#e8eaed", width=1.6];
+  nominatim [label="Nominatim API", shape=ellipse, fillcolor="#e8eaed", ];
+  resend    [label="Resend email API", shape=ellipse, fillcolor="#e8eaed", ];
 
   // ---------- ranks (left -> right) ----------
   { rank=same; users; locust; }
