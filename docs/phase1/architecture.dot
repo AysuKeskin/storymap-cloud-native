@@ -7,25 +7,24 @@ digraph storymap_gcp {
   users  [label="End users\nWeb / Mobile", shape=ellipse, fillcolor="#e8eaed", ];
 
   subgraph cluster_gcp {
-    label="GCP project - us-central1 - all resources provisioned with Terraform";
+    label="System project (account A, free trial, max 8 vCPU) - us-central1 - provisioned with Terraform";
     style="rounded,dashed"; color="#1a73e8"; fontcolor="#1a73e8"; margin=14;
 
     lb [label="External HTTP(S) LB\nGKE Ingress + static IP", fillcolor="#e8f0fe"];
 
     subgraph cluster_gke {
-      label="GKE Standard zonal cluster\nprivate nodes, node pool autoscaling 2-5 x e2-medium";
+      label="GKE Standard zonal cluster\nprivate nodes, node pool autoscaling 2-3 x e2-standard-2 (4-6 vCPU)";
       style="rounded,filled"; fillcolor="#e6f4ea"; color="#188038"; fontcolor="#188038";
       frontend [label="frontend Deployment\nnginx + React build\nHPA 1-3"];
-      api      [label="api Deployment\nDjango REST + Gunicorn\nHPA 2-10 @ 60% CPU", penwidth=2.2];
+      api      [label="api Deployment\nDjango REST + Gunicorn\nHPA 2-8 @ 60% CPU", penwidth=2.2];
       redis    [label="redis Deployment\nshared cache + lock"];
       migrate  [label="migrate Job\nmanage.py migrate", style="rounded,dashed,filled"];
     }
 
     subgraph cluster_vms {
-      label="Compute Engine VMs";
+      label="Compute Engine VM (2 vCPU)";
       style="rounded,filled"; fillcolor="#fef7e0"; color="#e37400"; fontcolor="#e37400";
       mysql  [label="mysql-vm (e2-medium)\nMySQL 8.0, private IP\nscheduled disk snapshots"];
-      locust [label="locust-vm (e2-standard-4)\nLocust master + workers\nstarted only for tests"];
     }
 
     subgraph cluster_serverless {
@@ -46,6 +45,12 @@ digraph storymap_gcp {
     }
   }
 
+  subgraph cluster_loadtest {
+    label="Load-testing project (account B, separate free trial)";
+    style="rounded,dashed"; color="#e37400"; fontcolor="#e37400"; margin=14;
+    locust [label="locust-vm (e2-standard-4, Spot)\nLocust master + workers\nstarted only for tests", fillcolor="#fef7e0"];
+  }
+
   nominatim [label="Nominatim API", shape=ellipse, fillcolor="#e8eaed", ];
   resend    [label="Resend email API", shape=ellipse, fillcolor="#e8eaed", ];
 
@@ -60,7 +65,7 @@ digraph storymap_gcp {
 
   // ---------- flows ----------
   users  -> lb [label="HTTPS"];
-  locust -> lb [label="load test", style=dashed, color="#e37400", fontcolor="#e37400"];
+  locust -> lb [label="load test via public IP", style=dashed, color="#e37400", fontcolor="#e37400"];
   lb -> frontend [label="/"];
   lb -> api [label="/api/*"];
   api -> redis [label="cache"];

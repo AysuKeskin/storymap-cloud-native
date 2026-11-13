@@ -104,15 +104,63 @@ search), media uploads, comments and likes, tags, notifications, gamification
         database migrations as a Kubernetes \code{Job}.
 \end{enumerate}
 
+
 % ------------------------------------------------------------
 \section{Tentative Cloud Architecture}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{architecture.pdf}
-  \caption{Tentative GCP architecture. All resources are provisioned with Terraform.}
+  \caption{Tentative GCP architecture. The system runs in one project that is
+  provisioned with Terraform. The load generator runs in a separate project.}
   \label{fig:arch}
 \end{figure}
+
+\subsection{Platform constraints and how the design meets them}
+
+\begin{itemize}
+  \item \textbf{8 vCPU limit.} A GCP free-trial account can run at most
+        \textbf{8 Compute Engine vCPUs at the same time}. GKE nodes count
+        towards this limit because they are Compute Engine VMs. The whole
+        system is therefore sized to stay at or below 8 vCPUs, even at peak
+        (Table~\ref{tab:vcpu}).
+  \item \textbf{Time window.} The trial credit of the system account expires
+        on \textbf{23 December 2026}. All development, experiments and the
+        demo are planned to finish before that date. Because the
+        infrastructure is written in Terraform, it can be recreated in another
+        account if the schedule slips.
+  \item \textbf{Separate load-testing project.} The Locust load generator is
+        not part of the system under test. It runs in a \textbf{separate
+        project under the partner's free-trial account} and reaches the system
+        only through the public load-balancer IP, the same way real users do.
+        This keeps the 8 vCPUs of the system account for the application.
+        It also keeps the load generator from competing for CPU with the
+        components it measures.
+  \item \textbf{Node type.} With at most three nodes allowed, we use
+        \textbf{e2-standard-2} nodes (2 dedicated vCPUs, 8\,GB) instead of
+        shared-core e2-medium. They give more allocatable CPU per node and
+        stable CPU measurements, without shared-core burst effects, for the
+        HPA experiments.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\linewidth}{L{3.6cm}Y L{2.6cm}}
+\toprule
+\textbf{Project} & \textbf{Compute Engine resources} & \textbf{vCPUs (limit 8)} \\
+\midrule
+System (account A) & GKE node pool 2--3 $\times$ e2-standard-2 & 4--6 \\
+                   & mysql-vm, 1 $\times$ e2-medium & 2 \\
+                   & \textbf{Peak total} & \textbf{8} \\
+\midrule
+Load testing (account B) & locust-vm, 1 $\times$ e2-standard-4 (only during tests) & 4 \\
+\bottomrule
+\end{tabularx}
+\caption{vCPU budget per free-trial account. Cloud Functions, Cloud Storage,
+Pub/Sub and the load balancer do not count towards the Compute Engine limit.}
+\label{tab:vcpu}
+\end{table}
 
 \subsection{Components}
 
@@ -133,7 +181,7 @@ search), media uploads, comments and likes, tags, notifications, gamification
   \code{/} to the frontend. \\
 \textbf{frontend} & GKE Deployment (+ HPA 1--3) &
   nginx serving the compiled React app. Lightweight and stateless. \\
-\textbf{api} & GKE Deployment (+ HPA 2--10 at 60\,\% CPU) &
+\textbf{api} & GKE Deployment (+ HPA 2--8 at 60\,\% CPU) &
   Django REST API on Gunicorn. Main scaling target and the focus of the
   performance tests. \\
 \textbf{redis} & GKE Deployment + ClusterIP Service &
@@ -146,9 +194,9 @@ search), media uploads, comments and likes, tags, notifications, gamification
   MySQL 8.0 on a private IP, reachable only from inside the VPC. Persistent
   disk with a scheduled snapshot policy. Chosen over Cloud SQL for cost and to
   satisfy the VM requirement with a stateful, functional role. \\
-\textbf{locust-vm} & Compute Engine VM (e2-standard-4) &
-  Runs Locust master and workers. Started only during experiments so that load
-  is generated outside the cluster it is measuring. \\
+\textbf{locust-vm} & Compute Engine VM (e2-standard-4, Spot) in the separate load-testing project &
+  Runs Locust master and workers. Started only during experiments. Generates
+  load from outside the system project, through the public endpoint. \\
 \textbf{Media bucket} & Cloud Storage &
   Stores user-uploaded images, audio and video, plus generated thumbnails. \\
 \textbf{make-thumbnail} & Cloud Function (2nd gen), GCS \emph{object finalize} trigger &
@@ -163,8 +211,8 @@ search), media uploads, comments and likes, tags, notifications, gamification
 \textbf{Artifact Registry} & Docker repository &
   Stores the \code{api} and \code{frontend} images built by GitHub Actions. \\
 \textbf{Cloud NAT} & Cloud Router + NAT &
-  Outbound internet access for private GKE nodes and VMs (Nominatim, package
-  installs). Nothing in the VPC has a public IP. \\
+  Outbound internet access for private GKE nodes and the MySQL VM (Nominatim,
+  package installs). Nothing in the VPC has a public IP. \\
 \textbf{Monitoring / Logging} & Cloud Monitoring, Cloud Logging &
   CPU, memory, pod count, LB latency and error metrics used in the performance
   evaluation. \\
@@ -186,20 +234,25 @@ search), media uploads, comments and likes, tags, notifications, gamification
         publish a small JSON message to \code{email-events} and return
         immediately. \code{send-email} then delivers the message. A slow
         e-mail provider no longer slows down API requests.
-  \item \textbf{Scaling.} The HPA adds \code{api} pods when average CPU
-        exceeds 60\,\%. The GKE cluster autoscaler adds nodes (2 $\rightarrow$
-        5) when pods cannot be scheduled.
-  \item \textbf{Deployment.} Terraform creates the VPC, NAT, GKE cluster, VMs,
-        bucket, Pub/Sub topic, Cloud Functions, Artifact Registry and a
-        billing budget. Kubernetes manifests (Deployments, Services, HPA,
-        Ingress, Job) are then applied with \code{kubectl}.
+  \item \textbf{Scaling.} The HPA adds \code{api} pods (2 $\rightarrow$ 8)
+        when average CPU exceeds 60\,\%. The GKE cluster autoscaler adds a
+        third node when pods cannot be scheduled. Three nodes are the maximum
+        allowed by the 8~vCPU limit.
+  \item \textbf{Deployment.} Terraform creates the VPC, NAT, GKE cluster, MySQL
+        VM, bucket, Pub/Sub topic, Cloud Functions, Artifact Registry and a
+        billing budget in the system project. A separate small Terraform
+        configuration creates \code{locust-vm} in the load-testing project.
+        Kubernetes manifests (Deployments, Services, HPA, Ingress, Job) are
+        applied with \code{kubectl}.
 \end{enumerate}
 
 \subsection{Planned performance experiments (preview)}
 
 Locust user classes will simulate (a) anonymous visitors browsing the map,
 feed and story details, (b) logged-in users who like and comment, and
-(c) content creators who post stories with images.
+(c) content creators who post stories with images. Geocoding requests are
+served from cache or a stub during load tests, so that the public Nominatim
+service is never load-tested.
 
 \begin{tabularx}{\linewidth}{YY}
 \toprule
@@ -208,7 +261,7 @@ feed and story details, (b) logged-in users who like and comment, and
 Number of concurrent users and spawn rate & p50 / p95 / p99 latency \\
 Read vs.\ write traffic mix & Throughput (requests per second) \\
 Redis cache on vs.\ off & Error rate \\
-HPA on (2--10 pods) vs.\ fixed replicas & CPU and memory of pods and the MySQL VM \\
+HPA on (2--8 pods) vs.\ fixed replicas & CPU and memory of pods and the MySQL VM \\
 Synchronous vs.\ Pub/Sub e-mail & Pod and node count over time \\
 \bottomrule
 \end{tabularx}
@@ -216,86 +269,97 @@ Synchronous vs.\ Pub/Sub e-mail & Pod and node count over time \\
 % ------------------------------------------------------------
 \section{Cost Estimation}
 
-Prices are \textbf{list prices for \code{us-central1}} taken from the GCP
-pricing pages. They will be re-checked in the GCP Pricing Calculator before
-deployment. We assume about \textbf{two months} of usage (mid-November to
-mid-January).
+\textbf{Assumptions.} Prices are list prices for \code{us-central1} taken
+from the GCP pricing pages, and will be re-checked in the GCP Pricing
+Calculator before deployment. The project runs from \textbf{13 November to 23
+December 2026} (40 days, 960 hours). The billing currency of the account is
+TRY. The trial credit of TRY\,14{,}440.57 corresponds to \$300, so we use
+1\,USD $\approx$ 48.1\,TRY. On 13 November, \textbf{TRY\,13{,}796 ($\approx$\,\$287)}
+of credit remains. About \$13 was used before this project started.
 
-\subsection{Monthly baseline (system running 24/7)}
+\subsection{System project (account A): baseline for 40 days, always on}
 
 {\small
-\begin{longtable}{L{3.6cm}L{3.9cm}L{3.6cm}L{3.4cm}}
+\begin{longtable}{L{3.4cm}L{3.9cm}L{3.9cm}L{3.3cm}}
 \toprule
-\textbf{Resource} & \textbf{Configuration} & \textbf{Unit price} & \textbf{Monthly cost} \\
+\textbf{Resource} & \textbf{Configuration} & \textbf{Unit price} & \textbf{Cost (960\,h)} \\
 \midrule
 \endfirsthead
 \toprule
-\textbf{Resource} & \textbf{Configuration} & \textbf{Unit price} & \textbf{Monthly cost} \\
+\textbf{Resource} & \textbf{Configuration} & \textbf{Unit price} & \textbf{Cost (960\,h)} \\
 \midrule
 \endhead
-GKE management fee & 1 zonal Standard cluster & \$0.10/h ($\approx$\,\$73) &
+GKE management fee & 1 zonal Standard cluster & \$0.10/h (\$96) &
   \textbf{\$0.00} (covered by the \$74.40/month GKE free-tier credit) \\
-GKE nodes & 2 $\times$ e2-medium (2 vCPU, 4\,GB) & \$0.0335/h each & \$48.92 \\
-Node boot disks & 2 $\times$ 30\,GB pd-standard & \$0.04/GB-month & \$2.40 \\
-mysql-vm & 1 $\times$ e2-medium & \$0.0335/h & \$24.46 \\
-mysql-vm disk + snapshots & 20\,GB pd-balanced + $\sim$5\,GB snapshots & \$0.10 and \$0.05/GB-month & \$2.25 \\
-HTTP(S) Load Balancer & 1 forwarding rule & \$0.025/h & \$18.25 \\
-Cloud NAT & 3 VM endpoints + low traffic & \$0.0014/h per VM + \$0.045/GB & \$3.57 \\
-Cloud Storage & $\sim$2\,GB Standard & \$0.020/GB-month & \$0.04 \\
-Artifact Registry & $\sim$2\,GB images (0.5\,GB free) & \$0.10/GB-month & \$0.15 \\
-Cloud Functions (2nd gen) & $<$\,100k invocations/month & free tier: 2M req., 180k vCPU-s & \$0.00 \\
-Pub/Sub & $<$\,1\,GB/month & first 10\,GiB free & \$0.00 \\
+GKE nodes & 2 $\times$ e2-standard-2 & \$0.067/h each & \$128.64 \\
+Node boot disks & 2 $\times$ 30\,GB pd-standard & \$0.04/GB-month & \$3.20 \\
+mysql-vm & 1 $\times$ e2-medium & \$0.0335/h & \$32.16 \\
+mysql-vm disk + snapshots & 20\,GB pd-balanced + $\sim$5\,GB snapshots & \$0.10 and \$0.05/GB-month & \$3.00 \\
+HTTP(S) Load Balancer & 1 forwarding rule & \$0.025/h & \$24.00 \\
+Cloud NAT & 3 VM endpoints + low traffic & \$0.0014/h per VM + \$0.045/GB & \$4.53 \\
+Cloud Storage, Artifact Registry & $\sim$2\,GB each & \$0.020 and \$0.10/GB-month & \$0.30 \\
+Cloud Functions (2nd gen) & $<$\,100k invocations & free tier: 2M req., 180k vCPU-s & \$0.00 \\
+Pub/Sub & $<$\,1\,GB & first 10\,GiB/month free & \$0.00 \\
 Monitoring and Logging & within free allotment (50\,GiB logs) & -- & \$0.00 \\
-Internet egress & $\sim$5--10\,GB & $\sim$\$0.12/GB & $\sim$\$1.00 \\
+Internet egress (normal use) & $\sim$10\,GB & $\sim$\$0.12/GB & \$1.50 \\
 \midrule
-\textbf{Total per month} & & & \textbf{$\approx$\,\$101} \\
+\textbf{Total (40 days)} & & & \textbf{$\approx$\,\$197} \\
 \bottomrule
 \end{longtable}
 }
 
-\subsection{Load-testing campaign (one-off, about 30 test hours)}
+\subsection{Load-testing campaign (about 30 test hours)}
 
 {\small
-\begin{tabularx}{\linewidth}{L{5.2cm}Y L{2cm}}
+\begin{tabularx}{\linewidth}{L{3.3cm}L{4.9cm}Y L{1.6cm}}
 \toprule
-\textbf{Resource} & \textbf{Usage} & \textbf{Cost} \\
+\textbf{Billed to} & \textbf{Resource} & \textbf{Usage} & \textbf{Cost} \\
 \midrule
-locust-vm (e2-standard-4) & 30\,h $\times$ \$0.134/h + 20\,GB disk & \$4.82 \\
-Extra GKE nodes from autoscaling & up to 3 $\times$ e2-medium $\times$ 30\,h & \$3.02 \\
-LB data processing and egress & $\sim$50\,GB $\times$ \$0.008/GB + misc. & \$1.50 \\
-Cloud Functions / Pub/Sub under load & still within the free tier & \$0.00 \\
+System (A) & Third GKE node from autoscaling & 30\,h $\times$ \$0.067/h & \$2.05 \\
+System (A) & LB data processing & $\sim$50\,GB $\times$ \$0.008/GB & \$0.40 \\
+System (A) & Response egress to the load generator & $\sim$50\,GB $\times$ up to \$0.12/GB & \$6.00 \\
 \midrule
-\textbf{Total} & & \textbf{$\approx$\,\$9.50} \\
+Load testing (B) & locust-vm e2-standard-4 & 30\,h $\times$ \$0.134/h (on-demand; Spot is cheaper) & \$4.02 \\
+Load testing (B) & locust-vm disk + egress & 20\,GB pd-standard, $\sim$5\,GB requests & \$1.70 \\
+\midrule
+\textbf{Total} & & & \textbf{$\approx$\,\$14} \\
 \bottomrule
 \end{tabularx}
 }
 
-\subsection{Project total vs.\ the \$300 credit}
+\subsection{Project total vs.\ the available credit}
 
 {\small
-\begin{tabularx}{\linewidth}{L{4.6cm}Y L{2.2cm}L{2.2cm}}
+\begin{tabularx}{\linewidth}{L{4.4cm}Y L{2.4cm}L{2.6cm}}
 \toprule
-\textbf{Scenario} & \textbf{Calculation} & \textbf{Total} & \textbf{Share of \$300} \\
+\textbf{Scenario} & \textbf{Calculation} & \textbf{Total} & \textbf{Share of credit} \\
 \midrule
-Worst case: always on & 2 $\times$ \$101 + \$9.50 & \textbf{$\approx$\,\$212} & 71\,\% \\
-Planned: shut down when idle & baseline $\sim$50\,\% of the time + tests & \textbf{$\approx$\,\$110--120} & $\sim$40\,\% \\
+System (A), worst case: always on & \$197 + \$8.45 (load tests) & \textbf{$\approx$\,\$206} & 72\,\% of \$287 \\
+System (A), planned: torn down when idle & $\sim$50\,\% of baseline hours + load tests & \textbf{$\approx$\,\$107} & 37\,\% of \$287 \\
+Load testing (B) & locust-vm only & \textbf{$\approx$\,\$6} & 2\,\% of \$300 \\
+Both accounts combined, worst case & \$206 + \$6 & \textbf{$\approx$\,\$212} & below one \$300 credit \\
 \bottomrule
 \end{tabularx}
 }
+
+Even if both accounts are counted against a single \$300 budget, the worst
+case stays below the limit.
 
 \textbf{Cost-control measures}
 \begin{itemize}
-  \item \code{terraform destroy}, or scaling the node pool to 0 and stopping
-        \code{mysql-vm} when the system is not needed. Everything can be
-        recreated from code in about 15 minutes.
-  \item \code{locust-vm} runs only during experiments and can use
-        \textbf{Spot} pricing ($\sim$60--90\,\% cheaper).
-  \item Small e2 machine types and 30\,GB pd-standard boot disks instead of the
-        100\,GB default.
+  \item \code{terraform destroy} when the system is not needed (nights,
+        weekends). Everything can be recreated from code in about 15 minutes.
+  \item \code{locust-vm} exists only during experiments and uses
+        \textbf{Spot} pricing ($\sim$60--90\,\% cheaper than on-demand).
+  \item The node pool is capped at 3 nodes, which also enforces the 8~vCPU
+        limit. Boot disks are 30\,GB pd-standard instead of the 100\,GB
+        default. GKE Managed Prometheus is disabled.
   \item Redis and MySQL are self-hosted, which avoids Memorystore
         ($\sim$\$35+/month) and Cloud SQL ($\sim$\$25--50/month).
-  \item A \textbf{billing budget with alerts at 50\,\%, 75\,\% and 90\,\%} of
-        \$300 is created by Terraform (\code{google\_billing\_budget}).
+  \item Terraform creates a billing budget (\code{google\_billing\_budget})
+        with \textbf{alerts at 50\,\%, 75\,\% and 90\,\%}. After each
+        teardown we check the billing report for leftover resources such as
+        load balancers, disks, static IPs and snapshots.
 \end{itemize}
 
 \end{document}
