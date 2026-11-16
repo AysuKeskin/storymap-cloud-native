@@ -86,8 +86,9 @@ cluster(6.2, 13.25, 12.8, 15.15,
 cluster(0.3, 0.95, 24.7, 12.95,
         "System project (account A, free trial, max 8 vCPU)  -  us-central1  -  Terraform",
         edge="#1a73e8", ls="--", label_x=11.0)
-cluster(0.6, 1.3, 18.0, 10.95, "VPC: storymap-vpc (private subnet, no public IPs)",
-        fill="#f8f9fa", edge="#9aa0a6", fc=GREY, label_x=9.3)
+cluster(0.6, 1.3, 18.0, 10.95,
+        "VPC: storymap-vpc (private subnet, no public IPs, Private Google Access enabled)",
+        fill="#f8f9fa", edge="#9aa0a6", fc=GREY, label_x=10.4)
 # The Kubernetes Services live inside the GKE cluster.
 cluster(0.8, 1.9, 14.6, 10.45,
         "GKE Standard zonal cluster  -  private nodes",
@@ -120,7 +121,11 @@ node(4.65, 7.4, 2.2, 0.8, "frontend Service\nport 80")
 node(7.6, 8.9, 2.8, 0.8, "frontend HPA\n1-3 replicas @ 60% CPU", fill="#fef7e0")
 node(10.6, 8.9, 2.8, 0.8, "api HPA\n2-8 replicas @ 60% CPU", fill="#fef7e0")
 node(7.7, 6.0, 2.4, 0.9, "frontend Pods\nnginx + React build")
-node(10.6, 6.0, 2.8, 0.9, "api Pods\nDjango REST + Gunicorn", lw=2.2)
+node(10.6, 6.0, 2.8, 0.9, "", lw=2.2)
+ax.text(10.6, 6.15, "api Pods\nDjango REST + Gunicorn", ha="center", va="center",
+        fontsize=NODE_FS, linespacing=1.1, zorder=6)
+ax.text(10.6, 5.74, "issues V4 signed URLs\n(upload PUT / download GET)", ha="center",
+        va="center", fontsize=10.5, linespacing=1.05, color="#3c4043", zorder=6)
 node(8.3, 4.2, 2.0, 0.8, "redis Pod\nshared cache + lock")
 node(12.8, 4.2, 2.0, 0.8, "migrate Job\nmanage.py migrate", ls="--")
 node(10.2, 2.6, 7.2, 0.8,
@@ -130,10 +135,15 @@ node(10.2, 2.6, 7.2, 0.8,
 node(16.4, 3.9, 2.4, 1.0, "mysql-vm (e2-medium)\nMySQL 8.0, private IP\nscheduled snapshots",
      fs=14)
 node(16.4, 9.9, 2.4, 0.8, "Cloud NAT\noutbound egress", fill="#f1f3f4")
+node(16.78, 8.15, 2.3, 1.4,
+     "Google APIs (Cloud Storage,\nPub/Sub, Artifact Registry,\nLogging) via Private Google\n"
+     "Access; Cloud NAT only for\nexternal APIs (Nominatim)",
+     fill="#ffffff", edge="#9aa0a6", ls="--", lw=1.0, fs=10.5)
 
 node(19.6, 6.1, 2.0, 0.8, "Pub/Sub topic\nemail-events")
 node(23.2, 6.1, 2.0, 0.8, "Cloud Function\nsend-email")
-node(19.6, 4.4, 2.2, 1.0, "Cloud Storage bucket\nmedia + thumbnails", shape="cylinder")
+node(19.6, 4.4, 2.2, 1.0, "Cloud Storage bucket\n(private)\nmedia + thumbnails",
+     shape="cylinder", fs=13)
 node(23.2, 4.4, 2.0, 0.8, "Cloud Function\nmake-thumbnail")
 
 node(20.0, 9.85, 2.6, 0.8, "Artifact Registry\ncontainer images")
@@ -171,8 +181,6 @@ edge([(16.4, 10.3), (16.4, 13.85)], "geocoding (HTTPS)", at=(16.55, 11.9),
      ha="left", ls=":")
 
 edge([(12.0, 6.1), (18.6, 6.1)], "publish email event", at=(16.4, 6.1))
-edge([(12.0, 5.85), (18.2, 5.85), (18.2, 4.4), (18.5, 4.4)],
-     "upload media", at=(13.4, 5.85))
 
 edge([(20.6, 6.1), (22.2, 6.1)], "trigger", at=(21.4, 6.1))
 edge([(20.7, 4.6), (22.2, 4.6)], "object finalize", at=(21.45, 4.8))
@@ -180,10 +188,11 @@ edge([(22.2, 4.15), (20.7, 4.15)], "write thumbnail", at=(21.45, 3.9))
 edge([(23.2, 6.5), (23.2, 13.85)], "send e-mail (HTTPS)", at=(23.05, 11.9),
      ha="right", ls=":")
 
-# lane drawn outside every box: browsers fetch media straight from the bucket
+# lane drawn outside every box: browsers upload/download media straight to/from
+# the private bucket with V4 signed URLs issued by the api Pods
 edge([(1.3, 14.25), (0.12, 14.25), (0.12, 0.62), (19.6, 0.62), (19.6, 3.9)],
-     "media download (HTTPS, public or signed URL), direct from the bucket",
-     at=(9.5, 0.62), ls="--")
+     "media upload (PUT) + download (GET) via V4 signed URL, HTTPS, direct to bucket",
+     at=(9.5, 0.62), ls="--", style="<|-|>")
 
 for ext in ("png", "pdf", "svg"):
     fig.savefig(f"architecture.{ext}", dpi=170 if ext == "png" else None,
